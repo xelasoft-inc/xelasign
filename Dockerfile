@@ -1,8 +1,10 @@
 FROM ruby:4.0.1-alpine AS download
 
+ARG PDFIUM_RELEASE=20260920
+
 WORKDIR /fonts
 
-RUN apk --no-cache add fontforge wget && \
+RUN apk --no-cache add fontforge wget unzip && \
     wget https://github.com/satbyy/go-noto-universal/releases/download/v7.0/GoNotoKurrent-Regular.ttf && \
     wget https://github.com/satbyy/go-noto-universal/releases/download/v7.0/GoNotoKurrent-Bold.ttf && \
     wget https://github.com/impallari/DancingScript/raw/master/fonts/DancingScript-Regular.otf && \
@@ -10,9 +12,15 @@ RUN apk --no-cache add fontforge wget && \
     wget https://github.com/Maxattax97/gnu-freefont/raw/master/ttf/FreeSans.ttf && \
     wget https://github.com/impallari/DancingScript/raw/master/OFL.txt && \
     wget -O /model.onnx "https://github.com/docusealco/fields-detection/releases/download/2.0.0/model_704_int8.onnx" && \
-    wget -O pdfium-linux.tgz "https://github.com/docusealco/pdfium-binaries/releases/latest/download/pdfium-linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').tgz" && \
+    case "$(uname -m)" in \
+      x86_64) pdfium_sha256=bbca8a648dbd1ba81f9c6c223f21dc394cf1ad381c6c17d60c6dcc4a7d3a2ae0 ;; \
+      aarch64) pdfium_sha256=73b72ed79b9bfdd494dee7e863482c24971a8d4b11f6cd1289aa170d31304a1f ;; \
+      *) echo "Unsupported PDFium architecture" >&2; exit 1 ;; \
+    esac && \
+    wget -O pdfium-linux.zip "https://github.com/docusealco/pdfium-binaries/releases/download/${PDFIUM_RELEASE}/pdfium-musl-$(uname -m).zip" && \
+    echo "${pdfium_sha256}  pdfium-linux.zip" | sha256sum -c - && \
     mkdir -p /pdfium-linux && \
-    tar -xzf pdfium-linux.tgz -C /pdfium-linux
+    unzip -q pdfium-linux.zip -d /pdfium-linux
 
 RUN fontforge -lang=py -c 'font1 = fontforge.open("FreeSans.ttf"); font2 = fontforge.open("NotoSansSymbols2-Regular.ttf"); font1.mergeFonts(font2); font1.generate("FreeSans.ttf")'
 
